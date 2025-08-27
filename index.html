@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 書架</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>PDF 書架</h1>
+        <div class="controls">
+            <button id="refreshBtn" onclick="refreshBookshelf()">重整書架</button>
+            <button id="listViewBtn" onclick="toggleView()">清單檢視</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="loadingMessage" class="loading">載入中...</div>
+        
+        <!-- 書架檢視 -->
+        <div id="bookshelfView" class="bookshelf">
+            <div id="pdfGrid" class="pdf-grid">
+                <!-- PDF書籍將動態載入到這裡 -->
+            </div>
+        </div>
+
+        <!-- 清單檢視 -->
+        <div id="listView" class="list-view hidden">
+            <table id="pdfTable">
+                <thead>
+                    <tr>
+                        <th>檔案名稱</th>
+                        <th>檔案大小</th>
+                        <th>最後修改</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfTableBody">
+                    <!-- PDF清單將動態載入到這裡 -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- PDF 閱讀器模態框 -->
+    <div id="pdfModal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closePdfModal()">&times;</button>
+            <div class="page-info-overlay">
+                <span id="pageInfo">頁面 1 / 1</span>
+            </div>
+            <div class="modal-body">
+                <div id="pdfViewer" class="pdf-viewer">
+                    <div class="click-area left-click" onclick="previousPage()"></div>
+                    <div class="book-spread">
+                        <div class="page-container left-page">
+                            <canvas id="pdfCanvasLeft"></canvas>
+                        </div>
+                        <div class="page-container right-page">
+                            <canvas id="pdfCanvasRight"></canvas>
+                        </div>
+                    </div>
+                    <div class="click-area right-click" onclick="nextPage()"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
