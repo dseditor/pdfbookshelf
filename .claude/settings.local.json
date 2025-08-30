@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

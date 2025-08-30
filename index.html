@@ -3,71 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF 書架</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>PDF Bookshelf</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="bento-styles.css">
+    
+    <!-- SVG Filters -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <filter id="glass-distortion">
+                <feTurbulence baseFrequency="0.02" numOctaves="3" result="noise"/>
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="2"/>
+            </filter>
+        </defs>
+    </svg>
 </head>
-<body>
-    <header>
-        <h1>PDF 書架</h1>
-        <div class="controls">
-            <button id="refreshBtn" onclick="refreshBookshelf()">重整書架</button>
-            <button id="listViewBtn" onclick="toggleView()">清單檢視</button>
-        </div>
-    </header>
-
-    <main>
-        <div id="loadingMessage" class="loading">載入中...</div>
-        
-        <!-- 書架檢視 -->
-        <div id="bookshelfView" class="bookshelf">
-            <div id="pdfGrid" class="pdf-grid">
-                <!-- PDF書籍將動態載入到這裡 -->
+<body class="min-h-screen text-white overflow-x-hidden">
+    <!-- Background -->
+    <div class="fixed inset-0 z-0">
+        <div class="absolute inset-0 bg-gradient-to-br from-black/90 to-black/70"></div>
+        <img src="./Assets/shelf.jpg" alt="Shelf Background" class="w-full h-full object-cover">
+    </div>
+    
+    <!-- Main Content -->
+    <div class="relative z-10 min-h-screen">
+        <!-- Header -->
+        <header class="pt-12 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-purple-500 to-blue-600 bg-clip-text text-transparent mb-4">
+                    PDF Bookshelf
+                </h1>
+                <p class="text-lg sm:text-xl text-white/70 font-light tracking-wide">
+                    Discover, Read, Experience
+                </p>
             </div>
-        </div>
-
-        <!-- 清單檢視 -->
-        <div id="listView" class="list-view hidden">
-            <table id="pdfTable">
-                <thead>
-                    <tr>
-                        <th>檔案名稱</th>
-                        <th>檔案大小</th>
-                        <th>最後修改</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="pdfTableBody">
-                    <!-- PDF清單將動態載入到這裡 -->
-                </tbody>
-            </table>
-        </div>
-    </main>
-
-    <!-- PDF 閱讀器模態框 -->
-    <div id="pdfModal" class="modal">
-        <div class="modal-content">
-            <button class="close-btn" onclick="closePdfModal()">&times;</button>
-            <div class="page-info-overlay">
-                <span id="pageInfo">頁面 1 / 1</span>
-            </div>
-            <div class="modal-body">
-                <div id="pdfViewer" class="pdf-viewer">
-                    <div class="click-area left-click" onclick="previousPage()"></div>
-                    <div class="book-spread">
-                        <div class="page-container left-page">
-                            <canvas id="pdfCanvasLeft"></canvas>
-                        </div>
-                        <div class="page-container right-page">
-                            <canvas id="pdfCanvasRight"></canvas>
-                        </div>
+            
+            <!-- Control Buttons -->
+            <div class="flex justify-center gap-4 mb-12">
+                <button id="homeBtn" class="liquidGlass-wrapper group" onclick="goToMainMenu()">
+                    <div class="liquidGlass-effect"></div>
+                    <div class="liquidGlass-tint"></div>
+                    <div class="liquidGlass-shine"></div>
+                    <div class="liquidGlass-text flex items-center gap-2 px-6 py-3">
+                        <span class="text-white font-medium">主選單</span>
+                        <span class="text-green-300 text-sm">Home</span>
                     </div>
-                    <div class="click-area right-click" onclick="nextPage()"></div>
+                </button>
+                
+                <button id="refreshBtn" class="liquidGlass-wrapper group" onclick="refreshBookshelf()">
+                    <div class="liquidGlass-effect"></div>
+                    <div class="liquidGlass-tint"></div>
+                    <div class="liquidGlass-shine"></div>
+                    <div class="liquidGlass-text flex items-center gap-2 px-6 py-3">
+                        <span class="text-white font-medium">重整書架</span>
+                        <span class="text-blue-300 text-sm">Refresh</span>
+                    </div>
+                </button>
+                
+                <button id="listViewBtn" class="liquidGlass-wrapper group" onclick="toggleView()">
+                    <div class="liquidGlass-effect"></div>
+                    <div class="liquidGlass-tint"></div>
+                    <div class="liquidGlass-shine"></div>
+                    <div class="liquidGlass-text flex items-center gap-2 px-6 py-3">
+                        <span class="text-white font-medium">清單檢視</span>
+                        <span class="text-purple-300 text-sm">List View</span>
+                    </div>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Loading Message -->
+        <div id="loadingMessage" class="text-center py-20 hidden">
+            <div class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+                <div class="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                <span class="text-xl font-medium">載入中...</span>
+            </div>
+        </div>
+
+        <!-- Thumbnail Loading Progress -->
+        <div id="thumbnailProgress" class="fixed bottom-5 left-5 z-30 hidden">
+            <div class="bg-black/80 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2">
+                <div class="flex items-center gap-2 text-white text-sm">
+                    <div class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span id="progressText">載入縮圖中...</span>
+                </div>
+                <div class="mt-2">
+                    <div class="w-48 h-1 bg-white/20 rounded-full overflow-hidden">
+                        <div id="progressBar" class="h-full bg-blue-400 transition-all duration-300" style="width: 0%"></div>
+                    </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Bento Grid Layout -->
+        <main class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto pb-20">
+            <!-- Navigation Breadcrumb -->
+            <nav id="breadcrumb" class="mb-8 hidden">
+                <div class="liquidGlass-wrapper">
+                    <div class="liquidGlass-effect"></div>
+                    <div class="liquidGlass-tint"></div>
+                    <div class="liquidGlass-shine"></div>
+                    <div class="liquidGlass-text p-4">
+                        <div class="flex items-center gap-2 text-white/80">
+                            <button onclick="goToMainMenu()" class="hover:text-white cursor-pointer text-blue-300">
+                                主分類 <span class="text-sm opacity-70">Categories</span>
+                            </button>
+                            <span id="breadcrumbSeparator" class="hidden">›</span>
+                            <span id="currentCategory" class="text-white font-medium"></span>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- PDF Grid View -->
+            <div id="bookshelfView" class="bento-grid">
+                <!-- Category Grid (First Level) -->
+                <div id="categoryGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
+                    <!-- Category cards will be dynamically loaded here -->
+                </div>
+                
+                <!-- PDF Grid (Second Level) -->
+                <div id="pdfGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8 hidden">
+                    <!-- PDF cards will be dynamically loaded here -->
+                </div>
+            </div>
+            
+            <!-- List View -->
+            <div id="listView" class="hidden">
+                <div class="liquidGlass-wrapper w-full">
+                    <div class="liquidGlass-effect"></div>
+                    <div class="liquidGlass-tint"></div>
+                    <div class="liquidGlass-shine"></div>
+                    <div class="liquidGlass-text p-6">
+                        <div class="overflow-x-auto">
+                            <table id="pdfTable" class="w-full">
+                                <thead>
+                                    <tr class="border-b border-white/20">
+                                        <th class="text-left py-4 px-2 font-bold text-white">檔案名稱 <span class="text-sm font-light text-white/60">Filename</span></th>
+                                        <th class="text-left py-4 px-2 font-bold text-white">大小 <span class="text-sm font-light text-white/60">Size</span></th>
+                                        <th class="text-left py-4 px-2 font-bold text-white">修改時間 <span class="text-sm font-light text-white/60">Modified</span></th>
+                                        <th class="text-left py-4 px-2 font-bold text-white">操作 <span class="text-sm font-light text-white/60">Action</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pdfTableBody">
+                                    <!-- Table content will be dynamically loaded -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-
-    <script src="script.js"></script>
+    
+    <!-- PDF Reader Modal -->
+    <div id="pdfModal" class="modal fixed inset-0 z-50 hidden">
+        <button class="close-btn fixed top-5 right-5 z-20 w-12 h-12 rounded-full bg-black/70 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-black/90 hover:scale-110 transition-all duration-300" onclick="closePdfModal()">
+            <span class="text-xl font-light">×</span>
+        </button>
+        
+        <div class="page-info-overlay fixed bottom-5 right-5 z-20 rounded-2xl bg-black/70 backdrop-blur-md border border-white/20">
+            <div class="flex items-center gap-3 px-4 py-2">
+                <span id="pageInfo" class="text-white font-medium cursor-pointer" onclick="togglePageInput()">Page 1 / 1</span>
+                <div id="pageInputContainer" class="hidden flex items-center gap-2">
+                    <span class="text-white/70 text-sm">跳至:</span>
+                    <input 
+                        type="number" 
+                        id="pageInput" 
+                        min="1" 
+                        class="w-16 px-2 py-1 text-sm bg-white/20 border border-white/30 rounded text-white placeholder-white/50 text-center"
+                        placeholder="頁"
+                        onkeypress="handlePageInputKeyPress(event)"
+                    >
+                    <button 
+                        onclick="jumpToPage()" 
+                        class="px-3 py-1 text-xs bg-blue-500/70 hover:bg-blue-500/90 rounded text-white transition-colors"
+                    >
+                        GO
+                    </button>
+                    <button 
+                        onclick="hidePageInput()" 
+                        class="px-2 py-1 text-xs bg-gray-500/70 hover:bg-gray-500/90 rounded text-white transition-colors"
+                    >
+                        ✕
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="w-full h-full bg-black/90 backdrop-blur-sm">
+            <div id="pdfViewer" class="w-full h-full flex items-center justify-center p-4">
+                <div class="click-area left-click absolute left-0 top-0 w-1/4 h-full z-10 cursor-pointer hover:bg-white/5 transition-colors" onclick="previousPage()"></div>
+                
+                <div class="book-spread flex gap-4 items-center justify-center max-w-full max-h-full">
+                    <div class="page-container left-page flex-1 flex justify-center items-center">
+                        <canvas id="pdfCanvasLeft" class="max-w-full max-h-[95vh] shadow-2xl rounded-lg"></canvas>
+                    </div>
+                    <div class="page-container right-page flex-1 flex justify-center items-center">
+                        <canvas id="pdfCanvasRight" class="max-w-full max-h-[95vh] shadow-2xl rounded-lg"></canvas>
+                    </div>
+                </div>
+                
+                <div class="click-area right-click absolute right-0 top-0 w-1/4 h-full z-10 cursor-pointer hover:bg-white/5 transition-colors" onclick="nextPage()"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="bento-script.js"></script>
 </body>
 </html>
