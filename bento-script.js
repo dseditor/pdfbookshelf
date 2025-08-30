@@ -445,7 +445,13 @@ function showCategoriesView() {
     const pdfGrid = document.getElementById('pdfGrid');
     const breadcrumb = document.getElementById('breadcrumb');
     const listView = document.getElementById('listView');
+    const bookshelfView = document.getElementById('bookshelfView');
     
+    // 確保主網格容器在主選單檢視時可見
+    if (bookshelfView) {
+        bookshelfView.classList.remove('hidden');
+    }
+
     pdfGrid.classList.add('hidden');
     breadcrumb.classList.add('hidden');
     
