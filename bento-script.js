@@ -177,40 +177,14 @@ async function loadPdfFiles(categoryFolder = null) {
 // 載入特定分類的PDF檔案
 async function loadCategoryPdfFiles(categoryFolder) {
     try {
-        // 定義該分類中已知的PDF檔案
-        const categoryPdfMap = {
-            'Architectural': [
-                'KirbyWorld卡比建築風格.pdf',
-                'KumaWorld拉拉熊建築風格.pdf', 
-                '熊熊世界甜點.pdf'
-            ],
-            'Design': [
-                'Hoob文具文青風格.pdf',
-                'Hoob文具可愛風格.pdf',
-                '拉拉熊文具可愛風格.pdf',
-                '拉拉熊文具台灣街景.pdf',
-                '拉拉熊文具攝影特集.pdf'
-            ],
-            'Interior': [],
-            'Misc': [
-                'Isomatic等距圖台灣街景.pdf',
-                'KirbyWorld拉拉熊公共設施.pdf'
-            ],
-            'Photo': [
-                '京都雨花.pdf',
-                '雨花彩花寫真.pdf',
-                '魔法雨花.pdf'
-            ]
-        };
+        // 首先嘗試動態掃描資料夾內容
+        const scannedFiles = await scanCategoryFolder(categoryFolder);
         
-        const expectedFiles = categoryPdfMap[categoryFolder] || [];
-        
-        for (const fileName of expectedFiles) {
-            try {
-                const filePath = `./PDF/${categoryFolder}/${fileName}`;
-                const testResponse = await fetch(filePath, { method: 'HEAD' });
-                
-                if (testResponse.ok) {
+        if (scannedFiles.length > 0) {
+            // 成功掃描到檔案，使用掃描結果
+            for (const fileName of scannedFiles) {
+                try {
+                    const filePath = `./PDF/${categoryFolder}/${fileName}`;
                     const fileStats = await getFileStats(filePath);
                     const displayName = fileName.replace('.pdf', '').replace('.PDF', '');
                     pdfFiles.push({
@@ -220,13 +194,129 @@ async function loadCategoryPdfFiles(categoryFolder) {
                         modified: fileStats.modified,
                         category: categoryFolder
                     });
+                } catch (error) {
+                    console.warn(`無法載入檔案: ${fileName}`, error);
                 }
-            } catch (error) {
-                console.warn(`無法載入檔案: ${fileName}`, error);
             }
+        } else {
+            // 無法掃描資料夾，回退到硬編碼清單
+            console.warn(`無法掃描分類 ${categoryFolder}，使用備用檔案清單`);
+            await loadCategoryPdfFilesFromMap(categoryFolder);
         }
     } catch (error) {
         console.warn(`載入分類 ${categoryFolder} 失敗:`, error);
+        // 錯誤時回退到硬編碼清單
+        await loadCategoryPdfFilesFromMap(categoryFolder);
+    }
+}
+
+// 動態掃描分類資料夾
+async function scanCategoryFolder(categoryFolder) {
+    const foundFiles = [];
+    
+    try {
+        // 嘗試獲取資料夾內容（這在某些環境中可能不工作）
+        const response = await fetch(`./PDF/${categoryFolder}/`);
+        if (response.ok) {
+            const text = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            const links = doc.querySelectorAll('a[href$=".pdf"], a[href$=".PDF"]');
+            
+            for (const link of links) {
+                const fileName = link.getAttribute('href');
+                if (fileName && !fileName.includes('/') && !fileName.startsWith('..')) {
+                    foundFiles.push(decodeURIComponent(fileName));
+                }
+            }
+        }
+    } catch (error) {
+        console.warn(`無法掃描資料夾 ${categoryFolder}:`, error);
+    }
+    
+    // 如果目錄掃描失敗，嘗試常見的檔案名稱模式
+    if (foundFiles.length === 0) {
+        const commonPatterns = [
+            // 根據分類嘗試一些常見的檔案名稱
+            ...(categoryFolder === 'Architectural' ? ['卡比建築風格', '拉拉熊建築風格', '熊熊世界甜點', 'KirbyWorld', 'KumaWorld'] : []),
+            ...(categoryFolder === 'Design' ? ['文具文青風格', '文具可愛風格', '拉拉熊文具', 'Hoob文具'] : []),
+            ...(categoryFolder === 'Photo' ? ['京都雨花', '雨花彩花', '魔法雨花', '攝影特集'] : []),
+            ...(categoryFolder === 'Misc' ? ['等距圖', '公共設施', 'Isomatic', 'KirbyWorld'] : []),
+            // 通用模式
+            'document', 'book', 'manual', 'guide', 'collection'
+        ];
+        
+        // 嘗試各種可能的檔案名稱
+        for (const pattern of commonPatterns) {
+            const possibleNames = [
+                `${pattern}.pdf`,
+                `${pattern}.PDF`
+            ];
+            
+            for (const fileName of possibleNames) {
+                try {
+                    const testResponse = await fetch(`./PDF/${categoryFolder}/${fileName}`, { method: 'HEAD' });
+                    if (testResponse.ok && !foundFiles.includes(fileName)) {
+                        foundFiles.push(fileName);
+                    }
+                } catch (error) {
+                    // 靜默跳過不存在的檔案
+                }
+            }
+        }
+    }
+    
+    return foundFiles;
+}
+
+// 從硬編碼清單載入PDF檔案（備用方案）
+async function loadCategoryPdfFilesFromMap(categoryFolder) {
+    const categoryPdfMap = {
+        'Architectural': [
+            'KirbyWorld卡比建築風格.pdf',
+            'KumaWorld拉拉熊建築風格.pdf', 
+            '熊熊世界甜點.pdf'
+        ],
+        'Design': [
+            'Hoob文具文青風格.pdf',
+            'Hoob文具可愛風格.pdf',
+            '拉拉熊文具可愛風格.pdf',
+            '拉拉熊文具台灣街景.pdf',
+            '拉拉熊文具攝影特集.pdf'
+        ],
+        'Interior': [],
+        'Misc': [
+            'Isomatic等距圖台灣街景.pdf',
+            'KirbyWorld拉拉熊公共設施.pdf'
+        ],
+        'Photo': [
+            '京都雨花.pdf',
+            '雨花彩花寫真.pdf',
+            '魔法雨花.pdf'
+        ]
+    };
+    
+    const expectedFiles = categoryPdfMap[categoryFolder] || [];
+    
+    for (const fileName of expectedFiles) {
+        try {
+            const filePath = `./PDF/${categoryFolder}/${fileName}`;
+            const testResponse = await fetch(filePath, { method: 'HEAD' });
+            
+            if (testResponse.ok) {
+                const fileStats = await getFileStats(filePath);
+                const displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                pdfFiles.push({
+                    name: displayName,
+                    path: filePath,
+                    size: fileStats.size,
+                    modified: fileStats.modified,
+                    category: categoryFolder
+                });
+            }
+        } catch (error) {
+            console.warn(`無法載入檔案: ${fileName}`, error);
+        }
     }
 }
 
@@ -1210,17 +1300,31 @@ async function toggleView() {
 async function refreshBookshelf() {
     showLoading(true);
     
+    // 清理快取以確保載入最新內容
+    if (thumbnailManager && thumbnailManager.cache) {
+        thumbnailManager.cache.clear();
+    }
+    
     if (currentView === 'categories') {
         // 重整分類檢視
         await displayCategories();
     } else if (currentView === 'pdfs' && currentCategory) {
         // 重整當前分類的PDF列表
         pdfFiles = [];
+        
+        // 清理之前的 lazy load observer
+        if (window.currentLazyLoadObserver) {
+            window.currentLazyLoadObserver.disconnect();
+        }
+        
+        // 重新載入PDF檔案
         await loadPdfFiles(currentCategory.folder);
         
-        // 根據當前檢視模式顯示內容
+        // 根據當前檢視模式重新顯示內容
         if (isListView) {
             displayList();
+        } else {
+            displayBooks();
         }
     }
     
