@@ -1,0 +1,6 @@
+*.md
+*.MD
+*.Md
+*.mD
+*.bat
+.claude/
