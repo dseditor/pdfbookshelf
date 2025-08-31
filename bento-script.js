@@ -17,6 +17,43 @@ let isLoadingThumbnails = false; // 載入狀態
 let observerMap = new Map(); // Intersection Observer 映射
 let thumbnailLoadingCount = 0; // 當前載入數量
 
+// PDF文件映射常量
+const CATEGORY_PDF_MAP = {
+    'Architectural': [
+        'kirby-world-architecture.pdf',
+        'kuma-world-rilakkuma-architecture.pdf', 
+        'bear-world-desserts.pdf'
+    ],
+    'Design': [
+        'hoob-literary-style.pdf',
+        'hoob-cute-style.pdf',
+        'rilakkuma-cute-style.pdf',
+        'rilakkuma-taiwan-street.pdf',
+        'rilakkuma-photo-collection.pdf'
+    ],
+    'Interior': [],
+    'Misc': [
+        'isomatic-taiwan-street.pdf',
+        'kirby-world-rilakkuma-facilities.pdf'
+    ],
+    'Photo': [
+        'kyoto-rain-flower.pdf',
+        'rain-flower-colorful-2nd.pdf',
+        'magic-rain-flower.pdf',
+        'magic-rain-flower-2nd.pdf',
+        'collect.pdf'
+    ]
+};
+
+// 缩图文件映射
+const CATEGORY_THUMBNAIL_MAP = {
+    'Architectural': 'kirby-world-architecture.pdf',
+    'Design': 'hoob-literary-style.pdf',
+    'Interior': null,
+    'Misc': 'isomatic-taiwan-street.pdf',
+    'Photo': 'kyoto-rain-flower.pdf'
+};
+
 // 定義分類結構
 const categories = [
     {
@@ -241,10 +278,28 @@ async function loadCategoryPdfFiles(categoryFolder) {
     }
 }
 
-// 動態掃描分類資料夾（GitHub Pages不支持目录列表，直接返回空数组使用备用方案）
+// 動態掃描分類資料夾
 async function scanCategoryFolder(categoryFolder) {
-    console.log(`GitHub Pages不支持目录列表，${categoryFolder} 将使用备用文件清单`);
-    return []; // 直接返回空数组，让系统使用loadCategoryPdfFilesFromMap
+    const foundFiles = [];
+    
+    // 从常量映射中获取文件名，然后验证它们是否存在
+    const expectedFiles = CATEGORY_PDF_MAP[categoryFolder] || [];
+    
+    // 验证每个文件是否真的存在
+    for (const fileName of expectedFiles) {
+        try {
+            const encodedFileName = encodeURIComponent(fileName);
+            const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
+            if (testResponse.ok) {
+                foundFiles.push(fileName);
+            }
+        } catch (error) {
+            console.warn(`文件不存在: ./PDF/${categoryFolder}/${fileName}`);
+        }
+    }
+    
+    console.log(`在 ${categoryFolder} 中找到 ${foundFiles.length} 個檔案:`, foundFiles);
+    return foundFiles;
 }
 
 // 從硬編碼清單載入PDF檔案（備用方案）
@@ -252,34 +307,7 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
     // 載入文件名映射
     const filenameMapping = await loadFilenameMapping(categoryFolder);
     
-    const categoryPdfMap = {
-        'Architectural': [
-            'kirby-world-architecture.pdf',
-            'kuma-world-rilakkuma-architecture.pdf', 
-            'bear-world-desserts.pdf'
-        ],
-        'Design': [
-            'hoob-literary-style.pdf',
-            'hoob-cute-style.pdf',
-            'rilakkuma-cute-style.pdf',
-            'rilakkuma-taiwan-street.pdf',
-            'rilakkuma-photo-collection.pdf'
-        ],
-        'Interior': [],
-        'Misc': [
-            'isomatic-taiwan-street.pdf',
-            'kirby-world-rilakkuma-facilities.pdf'
-        ],
-        'Photo': [
-            'kyoto-rain-flower.pdf',
-            'rain-flower-colorful-2nd.pdf',
-            'magic-rain-flower.pdf',
-            'magic-rain-flower-2nd.pdf',
-            'collect.pdf'
-        ]
-    };
-    
-    const expectedFiles = categoryPdfMap[categoryFolder] || [];
+    const expectedFiles = CATEGORY_PDF_MAP[categoryFolder] || [];
     
     for (const fileName of expectedFiles) {
         try {
@@ -347,9 +375,9 @@ async function loadAllPdfFiles() {
 
 // 載入本地PDF檔案（備用方案）
 async function loadLocalPdfFiles() {
-    // 嘗試一些常見的PDF檔案名稱
+    // 嘗試一些常見的PDF檔案名稱（更新為英文文件名）
     const possiblePdfs = [
-        '拉拉熊文具攝影特集.pdf',
+        'rilakkuma-photo-collection.pdf',
         // 可以在這裡添加其他可能的檔案名稱
     ];
     
@@ -391,7 +419,7 @@ async function loadLocalPdfFiles() {
     if (pdfFiles.length === 0) {
         const defaultFileStats = await getFileStats('./PDF/Design/rilakkuma-photo-collection.pdf');
         pdfFiles.push({
-            name: '拉拉熊文具攝影特集',
+            name: 'Rilakkuma Photo Collection',
             path: './PDF/Design/rilakkuma-photo-collection.pdf',
             size: defaultFileStats.size,
             modified: defaultFileStats.modified
@@ -594,15 +622,7 @@ function createCategoryCard(category, index) {
 
 // 生成分類縮圖（使用該分類第一本書的封面）
 async function generateCategoryThumbnail(category, cardElement) {
-    const categoryPdfMap = {
-        'Architectural': 'KirbyWorld卡比建築風格.pdf',
-        'Design': 'Hoob文具文青風格.pdf',
-        'Interior': null, // 沒有檔案
-        'Misc': 'Isomatic等距圖台灣街景.pdf',
-        'Photo': '京都雨花.pdf'
-    };
-    
-    const firstPdfFile = categoryPdfMap[category.folder];
+    const firstPdfFile = CATEGORY_THUMBNAIL_MAP[category.folder];
     if (!firstPdfFile) {
         // 如果沒有檔案，保持預設的資料夾圖示
         return;
