@@ -174,9 +174,27 @@ async function loadPdfFiles(categoryFolder = null) {
     showLoading(false);
 }
 
+// 載入文件名映射JSON
+async function loadFilenameMapping(categoryFolder) {
+    try {
+        const response = await fetch(`./PDF/${categoryFolder}/filenames.json`);
+        if (response.ok) {
+            const mapping = await response.json();
+            console.log(`成功載入 ${categoryFolder} 的文件名映射:`, mapping);
+            return mapping;
+        }
+    } catch (error) {
+        console.log(`無法載入 ${categoryFolder} 的文件名映射，將使用原始文件名:`, error);
+    }
+    return null;
+}
+
 // 載入特定分類的PDF檔案
 async function loadCategoryPdfFiles(categoryFolder) {
     try {
+        // 載入文件名映射
+        const filenameMapping = await loadFilenameMapping(categoryFolder);
+        
         // 首先嘗試動態掃描資料夾內容
         const scannedFiles = await scanCategoryFolder(categoryFolder);
         
@@ -184,16 +202,28 @@ async function loadCategoryPdfFiles(categoryFolder) {
             // 成功掃描到檔案，使用掃描結果
             for (const fileName of scannedFiles) {
                 try {
+                    // 跳過filenames.json文件
+                    if (fileName === 'filenames.json') continue;
+                    
                     const encodedFileName = encodeURIComponent(fileName);
                     const filePath = `./PDF/${categoryFolder}/${encodedFileName}`;
                     const fileStats = await getFileStats(filePath);
-                    const displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                    
+                    // 使用JSON映射的標題，如果沒有則使用原文件名
+                    let displayName;
+                    if (filenameMapping && filenameMapping[fileName]) {
+                        displayName = filenameMapping[fileName];
+                    } else {
+                        displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                    }
+                    
                     pdfFiles.push({
                         name: displayName,
                         path: filePath,
                         size: fileStats.size,
                         modified: fileStats.modified,
-                        category: categoryFolder
+                        category: categoryFolder,
+                        originalFileName: fileName
                     });
                 } catch (error) {
                     console.warn(`無法載入檔案: ${fileName}`, error);
@@ -273,28 +303,33 @@ async function scanCategoryFolder(categoryFolder) {
 
 // 從硬編碼清單載入PDF檔案（備用方案）
 async function loadCategoryPdfFilesFromMap(categoryFolder) {
+    // 載入文件名映射
+    const filenameMapping = await loadFilenameMapping(categoryFolder);
+    
     const categoryPdfMap = {
         'Architectural': [
-            'KirbyWorld卡比建築風格.pdf',
-            'KumaWorld拉拉熊建築風格.pdf', 
-            '熊熊世界甜點.pdf'
+            'kirby-world-architecture.pdf',
+            'kuma-world-rilakkuma-architecture.pdf', 
+            'bear-world-desserts.pdf'
         ],
         'Design': [
-            'Hoob文具文青風格.pdf',
-            'Hoob文具可愛風格.pdf',
-            '拉拉熊文具可愛風格.pdf',
-            '拉拉熊文具台灣街景.pdf',
-            '拉拉熊文具攝影特集.pdf'
+            'hoob-literary-style.pdf',
+            'hoob-cute-style.pdf',
+            'rilakkuma-cute-style.pdf',
+            'rilakkuma-taiwan-street.pdf',
+            'rilakkuma-photo-collection.pdf'
         ],
         'Interior': [],
         'Misc': [
-            'Isomatic等距圖台灣街景.pdf',
-            'KirbyWorld拉拉熊公共設施.pdf'
+            'isomatic-taiwan-street.pdf',
+            'kirby-world-rilakkuma-facilities.pdf'
         ],
         'Photo': [
-            '京都雨花.pdf',
-            '雨花彩花寫真.pdf',
-            '魔法雨花.pdf'
+            'kyoto-rain-flower.pdf',
+            'rain-flower-colorful-2nd.pdf',
+            'magic-rain-flower.pdf',
+            'magic-rain-flower-2nd.pdf',
+            'collect.pdf'
         ]
     };
     
@@ -308,7 +343,15 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
             
             if (testResponse.ok) {
                 const fileStats = await getFileStats(filePath);
-                const displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                
+                // 使用JSON映射的標題，如果沒有則使用原文件名
+                let displayName;
+                if (filenameMapping && filenameMapping[fileName]) {
+                    displayName = filenameMapping[fileName];
+                } else {
+                    displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                }
+                
                 pdfFiles.push({
                     name: displayName,
                     path: filePath,
@@ -400,10 +443,10 @@ async function loadLocalPdfFiles() {
     
     // 如果還是沒找到任何檔案，至少保留原有的檔案
     if (pdfFiles.length === 0) {
-        const defaultFileStats = await getFileStats('./PDF/拉拉熊文具攝影特集.pdf');
+        const defaultFileStats = await getFileStats('./PDF/Design/rilakkuma-photo-collection.pdf');
         pdfFiles.push({
             name: '拉拉熊文具攝影特集',
-            path: './PDF/拉拉熊文具攝影特集.pdf',
+            path: './PDF/Design/rilakkuma-photo-collection.pdf',
             size: defaultFileStats.size,
             modified: defaultFileStats.modified
         });
