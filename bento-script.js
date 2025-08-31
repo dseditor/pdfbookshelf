@@ -19,12 +19,52 @@ let thumbnailLoadingCount = 0; // 當前載入數量
 
 // 配置选项：选择部署平台
 const DEPLOYMENT_CONFIG = {
-    platform: 'github-pages', // 'github-pages' 或 'huggingface'
+    platform: 'auto', // 'auto', 'github-pages', 'huggingface', 或 'local'
     huggingface: {
         repoId: 'your-username/your-repo-name', // 替换为你的HF仓库ID
         apiBase: 'https://huggingface.co/api'
     }
 };
+
+// 自动检测运行环境
+function detectPlatform() {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    // 本地开发环境检测
+    if (hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') ||
+        protocol === 'file:') {
+        console.log('[DEBUG] 检测到本地开发环境');
+        return 'local';
+    }
+    
+    // HuggingFace Spaces检测
+    if (hostname.includes('hf.space') || hostname.includes('huggingface.co')) {
+        console.log('[DEBUG] 检测到HuggingFace环境');
+        return 'huggingface';
+    }
+    
+    // GitHub Pages检测
+    if (hostname.includes('github.io') || hostname.includes('github.com')) {
+        console.log('[DEBUG] 检测到GitHub Pages环境');
+        return 'github-pages';
+    }
+    
+    // 默认为GitHub Pages模式
+    console.log('[DEBUG] 未知环境，默认使用GitHub Pages模式');
+    return 'github-pages';
+}
+
+// 获取当前平台
+function getCurrentPlatform() {
+    if (DEPLOYMENT_CONFIG.platform === 'auto') {
+        return detectPlatform();
+    }
+    return DEPLOYMENT_CONFIG.platform;
+}
 
 // PDF文件映射常量
 const CATEGORY_PDF_MAP = {
@@ -157,20 +197,37 @@ async function rescanAllFiles() {
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[DEBUG] DOM加载完成，开始初始化...');
-    console.log('[DEBUG] 当前部署平台:', DEPLOYMENT_CONFIG.platform);
     
-    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
-        console.log('[DEBUG] HuggingFace模式：支持中文文件名，自动文件发现');
-        console.log('[DEBUG] HF仓库ID:', DEPLOYMENT_CONFIG.huggingface.repoId);
-        
-        // 检查HF配置
-        if (DEPLOYMENT_CONFIG.huggingface.repoId === 'your-username/your-repo-name') {
-            console.warn('⚠️ 请在DEPLOYMENT_CONFIG中配置正确的HuggingFace仓库ID！');
-        }
-    } else {
-        console.log('[DEBUG] GitHub Pages模式：使用JSON映射和英文文件名');
-        console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
-        console.log('[DEBUG] 使用的缩图映射:', CATEGORY_THUMBNAIL_MAP);
+    const actualPlatform = getCurrentPlatform();
+    const configPlatform = DEPLOYMENT_CONFIG.platform;
+    
+    console.log(`[DEBUG] 配置平台: ${configPlatform}, 实际检测平台: ${actualPlatform}`);
+    console.log(`[DEBUG] 当前运行环境: ${window.location.hostname} (${window.location.protocol})`);
+    
+    switch (actualPlatform) {
+        case 'local':
+            console.log('[DEBUG] 🏠 本地开发模式：');
+            console.log('  ✅ 支持中文文件名');
+            console.log('  ✅ 支持目录列表扫描');
+            console.log('  ✅ 支持实时文件发现');
+            console.log('  ℹ️ 可以直接添加PDF文件并重整书架');
+            break;
+            
+        case 'huggingface':
+            console.log('[DEBUG] 🤗 HuggingFace模式：支持中文文件名，自动文件发现');
+            console.log('[DEBUG] HF仓库ID:', DEPLOYMENT_CONFIG.huggingface.repoId);
+            
+            // 检查HF配置
+            if (DEPLOYMENT_CONFIG.huggingface.repoId === 'your-username/your-repo-name') {
+                console.warn('⚠️ 请在DEPLOYMENT_CONFIG中配置正确的HuggingFace仓库ID！');
+            }
+            break;
+            
+        default:
+            console.log('[DEBUG] 📄 GitHub Pages模式：使用JSON映射和英文文件名');
+            console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
+            console.log('[DEBUG] 使用的缩图映射:', CATEGORY_THUMBNAIL_MAP);
+            break;
     }
     
     initializeThumbnailLoader();
@@ -319,10 +376,12 @@ async function loadCategoryPdfFiles(categoryFolder) {
                     
                     // 根据平台处理显示名称
                     let displayName;
-                    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
-                        // HuggingFace支持中文文件名，直接使用文件名作为标题
+                    const platform = getCurrentPlatform();
+                    
+                    if (platform === 'huggingface' || platform === 'local') {
+                        // HuggingFace和本地环境支持中文文件名，直接使用文件名作为标题
                         displayName = fileName.replace(/\.pdf$/i, '');
-                        console.log(`[DEBUG] HF平台直接使用文件名: ${fileName} -> ${displayName}`);
+                        console.log(`[DEBUG] ${platform}平台直接使用文件名: ${fileName} -> ${displayName}`);
                     } else {
                         // GitHub Pages使用JSON映射或fallback
                         if (filenameMapping && filenameMapping[fileName]) {
@@ -399,13 +458,100 @@ async function scanCategoryFolderHF(categoryFolder) {
     return foundFiles;
 }
 
+// 本地开发环境扫描文件夹
+async function scanCategoryFolderLocal(categoryFolder) {
+    console.log(`[DEBUG] 本地环境扫描 ${categoryFolder}...`);
+    const foundFiles = [];
+    
+    try {
+        // 在本地环境中，我们可以尝试访问目录
+        const response = await fetch(`./PDF/${categoryFolder}/`);
+        if (response.ok) {
+            const text = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            
+            // 查找所有PDF链接
+            const links = doc.querySelectorAll('a[href]');
+            
+            for (const link of links) {
+                const href = link.getAttribute('href');
+                if (href && (href.endsWith('.pdf') || href.endsWith('.PDF'))) {
+                    // 排除父目录链接
+                    if (!href.startsWith('../') && !href.includes('/')) {
+                        const fileName = decodeURIComponent(href);
+                        foundFiles.push(fileName);
+                        console.log(`[DEBUG] 本地发现文件: ${fileName}`);
+                    }
+                }
+            }
+        } else {
+            console.warn(`本地目录访问失败: ${response.status}`);
+        }
+    } catch (error) {
+        console.warn('本地目录扫描错误:', error);
+    }
+    
+    // 如果目录扫描失败，使用文件存在性检查
+    if (foundFiles.length === 0) {
+        console.log(`[DEBUG] 目录扫描失败，使用文件存在性检查...`);
+        
+        // 检查预定义文件
+        const expectedFiles = CATEGORY_PDF_MAP[categoryFolder] || [];
+        for (const fileName of expectedFiles) {
+            try {
+                const encodedFileName = encodeURIComponent(fileName);
+                const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
+                if (testResponse.ok) {
+                    foundFiles.push(fileName);
+                    console.log(`[DEBUG] 本地验证文件: ${fileName}`);
+                }
+            } catch (error) {
+                // 静默跳过
+            }
+        }
+        
+        // 还可以尝试一些常见的中文文件名（本地开发时可能存在）
+        const chinesePatterns = [
+            '拉拉熊文具攝影特集.pdf',
+            '京都雨花.pdf',
+            '魔法雨花.pdf',
+            'KirbyWorld卡比建築風格.pdf',
+            'Hoob文具可愛風格.pdf'
+        ];
+        
+        for (const fileName of chinesePatterns) {
+            if (!foundFiles.includes(fileName)) {
+                try {
+                    const encodedFileName = encodeURIComponent(fileName);
+                    const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
+                    if (testResponse.ok) {
+                        foundFiles.push(fileName);
+                        console.log(`[DEBUG] 本地发现中文文件: ${fileName}`);
+                    }
+                } catch (error) {
+                    // 静默跳过
+                }
+            }
+        }
+    }
+    
+    console.log(`[DEBUG] 本地扫描 ${categoryFolder} 完成，找到 ${foundFiles.length} 個文件:`, foundFiles);
+    return foundFiles;
+}
+
 // 動態掃描分類資料夾
 async function scanCategoryFolder(categoryFolder) {
     // 根据部署平台选择扫描方法
-    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
-        return await scanCategoryFolderHF(categoryFolder);
-    } else {
-        return await scanCategoryFolderGitHub(categoryFolder);
+    const platform = getCurrentPlatform();
+    
+    switch (platform) {
+        case 'huggingface':
+            return await scanCategoryFolderHF(categoryFolder);
+        case 'local':
+            return await scanCategoryFolderLocal(categoryFolder);
+        default:
+            return await scanCategoryFolderGitHub(categoryFolder);
     }
 }
 
@@ -492,10 +638,12 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
                 
                 // 根据平台处理显示名称
                 let displayName;
-                if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
-                    // HuggingFace支持中文文件名，直接使用文件名作为标题
+                const platform = getCurrentPlatform();
+                
+                if (platform === 'huggingface' || platform === 'local') {
+                    // HuggingFace和本地环境支持中文文件名，直接使用文件名作为标题
                     displayName = fileName.replace(/\.pdf$/i, '');
-                    console.log(`[DEBUG] HF平台直接使用文件名: ${fileName} -> ${displayName}`);
+                    console.log(`[DEBUG] ${platform}平台直接使用文件名: ${fileName} -> ${displayName}`);
                 } else {
                     // GitHub Pages使用JSON映射或fallback
                     if (filenameMapping && filenameMapping[fileName]) {
