@@ -184,7 +184,8 @@ async function loadCategoryPdfFiles(categoryFolder) {
             // 成功掃描到檔案，使用掃描結果
             for (const fileName of scannedFiles) {
                 try {
-                    const filePath = `./PDF/${categoryFolder}/${fileName}`;
+                    const encodedFileName = encodeURIComponent(fileName);
+                    const filePath = `./PDF/${categoryFolder}/${encodedFileName}`;
                     const fileStats = await getFileStats(filePath);
                     const displayName = fileName.replace('.pdf', '').replace('.PDF', '');
                     pdfFiles.push({
@@ -255,7 +256,8 @@ async function scanCategoryFolder(categoryFolder) {
             
             for (const fileName of possibleNames) {
                 try {
-                    const testResponse = await fetch(`./PDF/${categoryFolder}/${fileName}`, { method: 'HEAD' });
+                    const encodedFileName = encodeURIComponent(fileName);
+                    const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
                     if (testResponse.ok && !foundFiles.includes(fileName)) {
                         foundFiles.push(fileName);
                     }
@@ -300,7 +302,8 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
     
     for (const fileName of expectedFiles) {
         try {
-            const filePath = `./PDF/${categoryFolder}/${fileName}`;
+            const encodedFileName = encodeURIComponent(fileName);
+            const filePath = `./PDF/${categoryFolder}/${encodedFileName}`;
             const testResponse = await fetch(filePath, { method: 'HEAD' });
             
             if (testResponse.ok) {
@@ -379,12 +382,13 @@ async function loadLocalPdfFiles() {
     
     for (const filename of allPossibleNames) {
         try {
-            const testResponse = await fetch(`./PDF/${filename}`, { method: 'HEAD' });
+            const encodedFilename = encodeURIComponent(filename);
+            const testResponse = await fetch(`./PDF/${encodedFilename}`, { method: 'HEAD' });
             if (testResponse.ok) {
-                const fileStats = await getFileStats(`./PDF/${filename}`);
+                const fileStats = await getFileStats(`./PDF/${encodedFilename}`);
                 pdfFiles.push({
                     name: filename.replace('.pdf', '').replace('.PDF', ''),
-                    path: `./PDF/${filename}`,
+                    path: `./PDF/${encodedFilename}`,
                     size: fileStats.size,
                     modified: fileStats.modified
                 });
@@ -616,7 +620,8 @@ async function generateCategoryThumbnail(category, cardElement) {
     }
     
     try {
-        const pdfPath = `./PDF/${category.folder}/${firstPdfFile}`;
+        const encodedPdfFile = encodeURIComponent(firstPdfFile);
+        const pdfPath = `./PDF/${category.folder}/${encodedPdfFile}`;
         await thumbnailManager.queueThumbnailLoad(pdfPath, cardElement, 300, 400);
     } catch (error) {
         console.warn(`為分類 ${category.name} 生成縮圖失敗:`, error);
