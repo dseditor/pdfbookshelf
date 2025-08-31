@@ -101,7 +101,33 @@ const appleGradients = [
     'apple-gradient-orange'
 ];
 
+// 清除所有缓存的调试功能
+function clearAllCaches() {
+    console.log('[DEBUG] 清除所有缓存...');
+    
+    // 清除缩图缓存
+    if (thumbnailManager && thumbnailManager.cache) {
+        thumbnailManager.cache.clear();
+        console.log('[DEBUG] 已清除缩图缓存');
+    }
+    
+    // 清除全局PDF文件列表
+    pdfFiles = [];
+    console.log('[DEBUG] 已清除PDF文件列表');
+    
+    // 清除浏览器缓存（仅对当前页面有效）
+    if ('caches' in window) {
+        caches.keys().then(function(names) {
+            for (let name of names) caches.delete(name);
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('[DEBUG] DOM加载完成，开始初始化...');
+    console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
+    console.log('[DEBUG] 使用的缩图映射:', CATEGORY_THUMBNAIL_MAP);
+    
     initializeThumbnailLoader();
     setupProgressTracking();
     displayCategories();
@@ -217,7 +243,7 @@ async function loadFilenameMapping(categoryFolder) {
         const response = await fetch(`./PDF/${categoryFolder}/filenames.json`);
         if (response.ok) {
             const mapping = await response.json();
-            console.log(`成功載入 ${categoryFolder} 的文件名映射:`, mapping);
+            console.log(`[DEBUG] 成功載入 ${categoryFolder} 的文件名映射:`, mapping);
             return mapping;
         }
     } catch (error) {
@@ -298,7 +324,7 @@ async function scanCategoryFolder(categoryFolder) {
         }
     }
     
-    console.log(`在 ${categoryFolder} 中找到 ${foundFiles.length} 個檔案:`, foundFiles);
+    console.log(`[DEBUG] 在 ${categoryFolder} 中找到 ${foundFiles.length} 個檔案:`, foundFiles);
     return foundFiles;
 }
 
@@ -631,6 +657,7 @@ async function generateCategoryThumbnail(category, cardElement) {
     try {
         const encodedPdfFile = encodeURIComponent(firstPdfFile);
         const pdfPath = `./PDF/${category.folder}/${encodedPdfFile}`;
+        console.log(`[DEBUG] 為分類 ${category.name} 生成縮圖，使用文件: ${firstPdfFile}, 路徑: ${pdfPath}`);
         await thumbnailManager.queueThumbnailLoad(pdfPath, cardElement, 300, 400);
     } catch (error) {
         console.warn(`為分類 ${category.name} 生成縮圖失敗:`, error);
