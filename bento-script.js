@@ -17,6 +17,15 @@ let isLoadingThumbnails = false; // 載入狀態
 let observerMap = new Map(); // Intersection Observer 映射
 let thumbnailLoadingCount = 0; // 當前載入數量
 
+// 配置选项：选择部署平台
+const DEPLOYMENT_CONFIG = {
+    platform: 'github-pages', // 'github-pages' 或 'huggingface'
+    huggingface: {
+        repoId: 'your-username/your-repo-name', // 替换为你的HF仓库ID
+        apiBase: 'https://huggingface.co/api'
+    }
+};
+
 // PDF文件映射常量
 const CATEGORY_PDF_MAP = {
     'Architectural': [
@@ -148,8 +157,21 @@ async function rescanAllFiles() {
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[DEBUG] DOM加载完成，开始初始化...');
-    console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
-    console.log('[DEBUG] 使用的缩图映射:', CATEGORY_THUMBNAIL_MAP);
+    console.log('[DEBUG] 当前部署平台:', DEPLOYMENT_CONFIG.platform);
+    
+    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
+        console.log('[DEBUG] HuggingFace模式：支持中文文件名，自动文件发现');
+        console.log('[DEBUG] HF仓库ID:', DEPLOYMENT_CONFIG.huggingface.repoId);
+        
+        // 检查HF配置
+        if (DEPLOYMENT_CONFIG.huggingface.repoId === 'your-username/your-repo-name') {
+            console.warn('⚠️ 请在DEPLOYMENT_CONFIG中配置正确的HuggingFace仓库ID！');
+        }
+    } else {
+        console.log('[DEBUG] GitHub Pages模式：使用JSON映射和英文文件名');
+        console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
+        console.log('[DEBUG] 使用的缩图映射:', CATEGORY_THUMBNAIL_MAP);
+    }
     
     initializeThumbnailLoader();
     setupProgressTracking();
@@ -295,18 +317,25 @@ async function loadCategoryPdfFiles(categoryFolder) {
                     const filePath = `./PDF/${categoryFolder}/${encodedFileName}`;
                     const fileStats = await getFileStats(filePath);
                     
-                    // 使用JSON映射的標題，如果沒有則使用原文件名（美化处理）
+                    // 根据平台处理显示名称
                     let displayName;
-                    if (filenameMapping && filenameMapping[fileName]) {
-                        displayName = filenameMapping[fileName];
-                        console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
+                    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
+                        // HuggingFace支持中文文件名，直接使用文件名作为标题
+                        displayName = fileName.replace(/\.pdf$/i, '');
+                        console.log(`[DEBUG] HF平台直接使用文件名: ${fileName} -> ${displayName}`);
                     } else {
-                        // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
-                        displayName = fileName
-                            .replace(/\.pdf$/i, '')
-                            .replace(/[-_]/g, ' ')
-                            .replace(/\b\w/g, char => char.toUpperCase());
-                        console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
+                        // GitHub Pages使用JSON映射或fallback
+                        if (filenameMapping && filenameMapping[fileName]) {
+                            displayName = filenameMapping[fileName];
+                            console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
+                        } else {
+                            // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
+                            displayName = fileName
+                                .replace(/\.pdf$/i, '')
+                                .replace(/[-_]/g, ' ')
+                                .replace(/\b\w/g, char => char.toUpperCase());
+                            console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
+                        }
                     }
                     
                     pdfFiles.push({
@@ -333,12 +362,59 @@ async function loadCategoryPdfFiles(categoryFolder) {
     }
 }
 
+// 使用HuggingFace API扫描文件夹
+async function scanCategoryFolderHF(categoryFolder) {
+    console.log(`[DEBUG] 使用HuggingFace API扫描 ${categoryFolder}...`);
+    const foundFiles = [];
+    
+    try {
+        const repoId = DEPLOYMENT_CONFIG.huggingface.repoId;
+        const apiUrl = `${DEPLOYMENT_CONFIG.huggingface.apiBase}/datasets/${repoId}/tree/main/PDF/${categoryFolder}`;
+        
+        console.log(`[DEBUG] 请求HF API: ${apiUrl}`);
+        const response = await fetch(apiUrl);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`[DEBUG] HF API响应:`, data);
+            
+            // 解析文件列表
+            if (Array.isArray(data)) {
+                for (const item of data) {
+                    if (item.type === 'file' && item.path.endsWith('.pdf')) {
+                        const fileName = item.path.split('/').pop();
+                        foundFiles.push(fileName);
+                        console.log(`[DEBUG] HF发现文件: ${fileName}`);
+                    }
+                }
+            }
+        } else {
+            console.warn(`HF API请求失败: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.warn(`HF API请求错误:`, error);
+    }
+    
+    console.log(`[DEBUG] HF扫描 ${categoryFolder} 完成，找到 ${foundFiles.length} 個文件:`, foundFiles);
+    return foundFiles;
+}
+
 // 動態掃描分類資料夾
 async function scanCategoryFolder(categoryFolder) {
+    // 根据部署平台选择扫描方法
+    if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
+        return await scanCategoryFolderHF(categoryFolder);
+    } else {
+        return await scanCategoryFolderGitHub(categoryFolder);
+    }
+}
+
+// GitHub Pages扫描方法
+async function scanCategoryFolderGitHub(categoryFolder) {
     const foundFiles = [];
     
     // 1. 首先检查预定义的文件
-    console.log(`[DEBUG] 检查 ${categoryFolder} 的预定义文件...`);
+    console.log(`[DEBUG] GitHub扫描 - 检查 ${categoryFolder} 的预定义文件...`);
     const expectedFiles = CATEGORY_PDF_MAP[categoryFolder] || [];
     
     for (const fileName of expectedFiles) {
@@ -414,18 +490,25 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
             if (testResponse.ok) {
                 const fileStats = await getFileStats(filePath);
                 
-                // 使用JSON映射的標題，如果沒有則使用原文件名（美化处理）
+                // 根据平台处理显示名称
                 let displayName;
-                if (filenameMapping && filenameMapping[fileName]) {
-                    displayName = filenameMapping[fileName];
-                    console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
+                if (DEPLOYMENT_CONFIG.platform === 'huggingface') {
+                    // HuggingFace支持中文文件名，直接使用文件名作为标题
+                    displayName = fileName.replace(/\.pdf$/i, '');
+                    console.log(`[DEBUG] HF平台直接使用文件名: ${fileName} -> ${displayName}`);
                 } else {
-                    // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
-                    displayName = fileName
-                        .replace(/\.pdf$/i, '')
-                        .replace(/[-_]/g, ' ')
-                        .replace(/\b\w/g, char => char.toUpperCase());
-                    console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
+                    // GitHub Pages使用JSON映射或fallback
+                    if (filenameMapping && filenameMapping[fileName]) {
+                        displayName = filenameMapping[fileName];
+                        console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
+                    } else {
+                        // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
+                        displayName = fileName
+                            .replace(/\.pdf$/i, '')
+                            .replace(/[-_]/g, ' ')
+                            .replace(/\b\w/g, char => char.toUpperCase());
+                        console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
+                    }
                 }
                 
                 pdfFiles.push({
