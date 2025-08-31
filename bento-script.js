@@ -123,6 +123,29 @@ function clearAllCaches() {
     }
 }
 
+// 重新扫描所有文件（用于上传新文件后）
+async function rescanAllFiles() {
+    console.log('[DEBUG] 开始重新扫描所有文件...');
+    
+    // 清除当前文件列表
+    pdfFiles = [];
+    
+    // 重新扫描每个分类
+    for (const category of categories) {
+        console.log(`[DEBUG] 重新扫描分类: ${category.folder}`);
+        await loadCategoryPdfFiles(category.folder);
+    }
+    
+    // 刷新显示
+    if (currentView === 'categories') {
+        displayCategories();
+    } else if (currentView === 'pdfs') {
+        displayPdfsInCategory(currentCategory);
+    }
+    
+    console.log(`[DEBUG] 重新扫描完成，总共找到 ${pdfFiles.length} 个文件`);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[DEBUG] DOM加载完成，开始初始化...');
     console.log('[DEBUG] 使用的PDF文件映射:', CATEGORY_PDF_MAP);
@@ -272,12 +295,18 @@ async function loadCategoryPdfFiles(categoryFolder) {
                     const filePath = `./PDF/${categoryFolder}/${encodedFileName}`;
                     const fileStats = await getFileStats(filePath);
                     
-                    // 使用JSON映射的標題，如果沒有則使用原文件名
+                    // 使用JSON映射的標題，如果沒有則使用原文件名（美化处理）
                     let displayName;
                     if (filenameMapping && filenameMapping[fileName]) {
                         displayName = filenameMapping[fileName];
+                        console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
                     } else {
-                        displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                        // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
+                        displayName = fileName
+                            .replace(/\.pdf$/i, '')
+                            .replace(/[-_]/g, ' ')
+                            .replace(/\b\w/g, char => char.toUpperCase());
+                        console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
                     }
                     
                     pdfFiles.push({
@@ -308,23 +337,64 @@ async function loadCategoryPdfFiles(categoryFolder) {
 async function scanCategoryFolder(categoryFolder) {
     const foundFiles = [];
     
-    // 从常量映射中获取文件名，然后验证它们是否存在
+    // 1. 首先检查预定义的文件
+    console.log(`[DEBUG] 检查 ${categoryFolder} 的预定义文件...`);
     const expectedFiles = CATEGORY_PDF_MAP[categoryFolder] || [];
     
-    // 验证每个文件是否真的存在
     for (const fileName of expectedFiles) {
         try {
             const encodedFileName = encodeURIComponent(fileName);
             const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
             if (testResponse.ok) {
                 foundFiles.push(fileName);
+                console.log(`[DEBUG] 找到预定义文件: ${fileName}`);
             }
         } catch (error) {
-            console.warn(`文件不存在: ./PDF/${categoryFolder}/${fileName}`);
+            console.warn(`预定义文件不存在: ./PDF/${categoryFolder}/${fileName}`);
         }
     }
     
-    console.log(`[DEBUG] 在 ${categoryFolder} 中找到 ${foundFiles.length} 個檔案:`, foundFiles);
+    // 2. 尝试发现新文件（使用常见的文件名模式）
+    console.log(`[DEBUG] 尝试发现 ${categoryFolder} 中的新文件...`);
+    const commonPatterns = [
+        // 常见的英文模式
+        'document', 'book', 'manual', 'guide', 'collection', 'portfolio', 'catalog',
+        'design', 'architecture', 'photo', 'misc', 'interior', 'art', 'work',
+        'project', 'sample', 'demo', 'test', 'new', 'latest', 'updated',
+        // 数字模式
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+        // 日期模式
+        '2023', '2024', '2025'
+    ];
+    
+    // 为每个模式尝试多种变体
+    for (const pattern of commonPatterns) {
+        const variations = [
+            `${pattern}.pdf`,
+            `${pattern}.PDF`,
+            `${categoryFolder.toLowerCase()}-${pattern}.pdf`,
+            `${pattern}-${categoryFolder.toLowerCase()}.pdf`,
+            `${pattern}_${categoryFolder.toLowerCase()}.pdf`,
+            `${categoryFolder.toLowerCase()}_${pattern}.pdf`
+        ];
+        
+        for (const fileName of variations) {
+            if (foundFiles.includes(fileName)) continue; // 跳过已经找到的文件
+            
+            try {
+                const encodedFileName = encodeURIComponent(fileName);
+                const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
+                if (testResponse.ok) {
+                    foundFiles.push(fileName);
+                    console.log(`[DEBUG] 发现新文件: ${fileName}`);
+                }
+            } catch (error) {
+                // 静默跳过不存在的文件
+            }
+        }
+    }
+    
+    console.log(`[DEBUG] 在 ${categoryFolder} 中总共找到 ${foundFiles.length} 個檔案:`, foundFiles);
     return foundFiles;
 }
 
@@ -344,12 +414,18 @@ async function loadCategoryPdfFilesFromMap(categoryFolder) {
             if (testResponse.ok) {
                 const fileStats = await getFileStats(filePath);
                 
-                // 使用JSON映射的標題，如果沒有則使用原文件名
+                // 使用JSON映射的標題，如果沒有則使用原文件名（美化处理）
                 let displayName;
                 if (filenameMapping && filenameMapping[fileName]) {
                     displayName = filenameMapping[fileName];
+                    console.log(`[DEBUG] 使用JSON映射标题: ${fileName} -> ${displayName}`);
                 } else {
-                    displayName = fileName.replace('.pdf', '').replace('.PDF', '');
+                    // 美化文件名：移除.pdf，将连字符和下划线替换为空格，首字母大写
+                    displayName = fileName
+                        .replace(/\.pdf$/i, '')
+                        .replace(/[-_]/g, ' ')
+                        .replace(/\b\w/g, char => char.toUpperCase());
+                    console.log(`[DEBUG] 使用fallback显示名: ${fileName} -> ${displayName}`);
                 }
                 
                 pdfFiles.push({
