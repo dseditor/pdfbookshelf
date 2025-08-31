@@ -241,64 +241,10 @@ async function loadCategoryPdfFiles(categoryFolder) {
     }
 }
 
-// 動態掃描分類資料夾
+// 動態掃描分類資料夾（GitHub Pages不支持目录列表，直接返回空数组使用备用方案）
 async function scanCategoryFolder(categoryFolder) {
-    const foundFiles = [];
-    
-    try {
-        // 嘗試獲取資料夾內容（這在某些環境中可能不工作）
-        const response = await fetch(`./PDF/${categoryFolder}/`);
-        if (response.ok) {
-            const text = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(text, 'text/html');
-            const links = doc.querySelectorAll('a[href$=".pdf"], a[href$=".PDF"]');
-            
-            for (const link of links) {
-                const fileName = link.getAttribute('href');
-                if (fileName && !fileName.includes('/') && !fileName.startsWith('..')) {
-                    foundFiles.push(decodeURIComponent(fileName));
-                }
-            }
-        }
-    } catch (error) {
-        console.warn(`無法掃描資料夾 ${categoryFolder}:`, error);
-    }
-    
-    // 如果目錄掃描失敗，嘗試常見的檔案名稱模式
-    if (foundFiles.length === 0) {
-        const commonPatterns = [
-            // 根據分類嘗試一些常見的檔案名稱
-            ...(categoryFolder === 'Architectural' ? ['卡比建築風格', '拉拉熊建築風格', '熊熊世界甜點', 'KirbyWorld', 'KumaWorld'] : []),
-            ...(categoryFolder === 'Design' ? ['文具文青風格', '文具可愛風格', '拉拉熊文具', 'Hoob文具'] : []),
-            ...(categoryFolder === 'Photo' ? ['京都雨花', '雨花彩花', '魔法雨花', '攝影特集'] : []),
-            ...(categoryFolder === 'Misc' ? ['等距圖', '公共設施', 'Isomatic', 'KirbyWorld'] : []),
-            // 通用模式
-            'document', 'book', 'manual', 'guide', 'collection'
-        ];
-        
-        // 嘗試各種可能的檔案名稱
-        for (const pattern of commonPatterns) {
-            const possibleNames = [
-                `${pattern}.pdf`,
-                `${pattern}.PDF`
-            ];
-            
-            for (const fileName of possibleNames) {
-                try {
-                    const encodedFileName = encodeURIComponent(fileName);
-                    const testResponse = await fetch(`./PDF/${categoryFolder}/${encodedFileName}`, { method: 'HEAD' });
-                    if (testResponse.ok && !foundFiles.includes(fileName)) {
-                        foundFiles.push(fileName);
-                    }
-                } catch (error) {
-                    // 靜默跳過不存在的檔案
-                }
-            }
-        }
-    }
-    
-    return foundFiles;
+    console.log(`GitHub Pages不支持目录列表，${categoryFolder} 将使用备用文件清单`);
+    return []; // 直接返回空数组，让系统使用loadCategoryPdfFilesFromMap
 }
 
 // 從硬編碼清單載入PDF檔案（備用方案）
