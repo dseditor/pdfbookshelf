@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>設計工具箱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+        /* -- 動畫效果 -- */
+        .child-container {
+            transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .child-container.expanded {
+            max-height: 1000px; /* 設定一個足夠大的值 */
+            opacity: 1;
+        }
+        .icon-rotate {
+            transition: transform 0.3s ease-in-out;
+        }
+        .expanded .icon-rotate {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500">Gemini設計工具箱</h1>
+            <p class="mt-3 text-lg text-gray-400">點擊主卡片展開或收合分類</p>
+        </header>
+
+        <!-- Bento Grid 容器 -->
+        <div id="bento-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            <!-- 內容將由 JavaScript 動態生成 -->
+        </div>
+
+        <footer class="text-center mt-8 md:mt-12 py-4 border-t border-gray-800">
+            <p class="text-gray-500">
+                Made by <a href="https://www.facebook.com/fuchiang.chen" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:text-sky-300 transition-colors">Chen Fu-Chiang</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // -- 資料來源 --
+        // 解析您提供的文字檔，建立資料結構
+        const linkData = [
+            { id: '1', title: '系統櫃參數控制器', url: 'https://gemini.google.com/share/d9def6c11faa' },
+            { id: '2', title: '圖片轉提示詞生成器', url: 'https://gemini.google.com/share/0253e25edee0' },
+            { 
+                id: '3', 
+                title: '人物雜誌封面產生器', 
+                children: [
+                    { id: '3-1', title: '單張', url: 'https://gemini.google.com/share/ca8198936c8d' },
+                    { id: '3-2', title: '2張', url: 'https://gemini.google.com/share/4573a7d8b4b6' },
+                    { id: '3-3', title: '2張+手機桌布', url: 'https://g.co/gemini/share/14994159b3de' }
+                ] 
+            },
+            { 
+                id: '4', 
+                title: 'AI材質板與風格遷移', 
+                children: [
+                    { id: '4-1', title: '基礎版', url: 'https://gemini.google.com/share/85931ba43cea' },
+                    { id: '4-2', title: '增加權重調整', url: 'https://gemini.google.com/share/d6004afd2298' },
+                    { id: '4-3', title: '增加建築靈感融合器', url: 'https://g.co/gemini/share/85bd618090c0' },
+                    { id: '4-4', title: '強化版', url: 'https://g.co/gemini/share/d4950c7f3d1b' }
+                ] 
+            },
+            { 
+                id: '5', 
+                title: 'AI單眼攝影模擬器', 
+                children: [
+                    { id: '5-1', title: '基礎版', url: 'https://g.co/gemini/share/da08c097f0b0' },
+                    { id: '5-2', title: 'Debug 01', url: 'https://g.co/gemini/share/8b2e3b8558dc' },
+                    { id: '5-3', title: '增加 Nikon Z8 機身與鏡頭', url: 'https://gemini.google.com/share/1501bfb54425' }
+                ]
+            },
+            { id: '6', title: '塔羅牌創作工作台_測試版', url: 'https://g.co/gemini/share/c157a840a1a1' },
+            { 
+                id: '7', 
+                title: 'AI施工細部大樣圖生成工具', 
+                children: [
+                    { id: '7-0', title: '基礎版', url: 'https://g.co/gemini/share/48df63cf0cbf' },
+                    { id: '7-1', title: '增加擬真照片生成', url: 'https://g.co/gemini/share/074659f0a21d' },
+                    { id: '7-2', title: '增加風格描述權重', url: 'https://g.co/gemini/share/dad37a4b92b9' }
+                ]
+            },
+             { 
+                id: '8', 
+                title: 'AI 建築立面與俯視圖模擬器', 
+                children: [
+                    { id: '8-0', title: '基礎版', url: 'https://g.co/gemini/share/927bb126c6f7' },
+                    { id: '8-1', title: '增加互動視角模擬', url: 'https://g.co/gemini/share/86ab9e1528c2' }
+                ]
+            },
+            { 
+                id: '9', 
+                title: 'AI燈光與攝影模擬器', 
+                children: [
+                    { id: '9-0', title: '基礎版', url: 'https://g.co/gemini/share/ef392b623085' },
+                    { id: '9-1', title: '增加互動視角模擬', url: 'https://g.co/gemini/share/e078e6773d2c' }
+                ]
+            }
+        ];
+
+        // -- 顏色設定 --
+        // 為不同分類定義顏色
+        const colors = [
+            'bg-sky-800/70', 'bg-emerald-800/70', 'bg-indigo-800/70', 'bg-rose-800/70', 
+            'bg-amber-800/70', 'bg-teal-800/70', 'bg-purple-800/70', 'bg-cyan-800/70', 'bg-fuchsia-800/70'
+        ];
+        
+        const hoverColors = [
+            'hover:bg-sky-700/80', 'hover:bg-emerald-700/80', 'hover:bg-indigo-700/80', 'hover:bg-rose-700/80', 
+            'hover:bg-amber-700/80', 'hover:bg-teal-700/80', 'hover:bg-purple-700/80', 'hover:bg-cyan-700/80', 'hover:bg-fuchsia-700/80'
+        ];
+
+        const grid = document.getElementById('bento-grid');
+
+        // -- 動態生成卡片 --
+        linkData.forEach((item, index) => {
+            const colorIndex = index % colors.length;
+            const mainColor = colors[colorIndex];
+            const hoverColor = hoverColors[colorIndex];
+
+            // 建立每個項目的容器，這樣展開時佈局才不會亂掉
+            const itemContainer = document.createElement('div');
+            
+            // 根據是否有子項目決定 grid-span
+            // 讓有子項目的卡片更大，更醒目
+            if (item.children && item.children.length > 0) {
+                 itemContainer.className = 'sm:col-span-2';
+            }
+            
+            // 1. 建立主卡片
+            if (item.children && item.children.length > 0) {
+                // --- 可展開的父卡片 ---
+                const parentCard = document.createElement('div');
+                parentCard.className = `parent-card group p-5 rounded-xl cursor-pointer flex justify-between items-center transition-all duration-300 ${mainColor} ${hoverColor}`;
+                parentCard.dataset.target = `children-${item.id}`;
+                
+                parentCard.innerHTML = `
+                    <div>
+                        <span class="text-lg font-bold text-gray-200 group-hover:text-white">${item.title}</span>
+                        <p class="text-sm text-gray-400 group-hover:text-gray-300">${item.children.length} 個子項目</p>
+                    </div>
+                    <svg class="icon-rotate w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                `;
+                itemContainer.appendChild(parentCard);
+
+                // 2. 建立子卡片容器
+                const childContainer = document.createElement('div');
+                childContainer.id = `children-${item.id}`;
+                childContainer.className = 'child-container ml-4 pl-4 border-l-2 border-gray-700/50 mt-4 space-y-3';
+                
+                item.children.forEach(child => {
+                    const childCard = document.createElement('a');
+                    childCard.href = child.url;
+                    childCard.target = '_blank';
+                    childCard.rel = 'noopener noreferrer';
+                    childCard.className = `child-card group block p-4 rounded-lg bg-gray-800/60 hover:bg-gray-700/80 transition-all duration-300 transform hover:scale-[1.02]`;
+                    childCard.innerHTML = `
+                         <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-300 group-hover:text-white">${child.title}</span>
+                            <svg class="w-5 h-5 text-gray-500 group-hover:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                         </div>
+                    `;
+                    childContainer.appendChild(childCard);
+                });
+                itemContainer.appendChild(childContainer);
+
+            } else {
+                // --- 單一連結卡片 ---
+                const singleCard = document.createElement('a');
+                singleCard.href = item.url;
+                singleCard.target = '_blank';
+                singleCard.rel = 'noopener noreferrer';
+                singleCard.className = `group block p-5 rounded-xl h-full transition-all duration-300 transform hover:-translate-y-1 ${mainColor} ${hoverColor}`;
+                
+                // 讓單張卡片也能撐滿高度
+                 itemContainer.className = 'h-full';
+
+                singleCard.innerHTML = `
+                    <div class="flex flex-col justify-between h-full">
+                        <span class="text-lg font-bold text-gray-200 group-hover:text-white">${item.title}</span>
+                        <div class="text-right mt-4">
+                            <svg class="inline-block w-6 h-6 text-gray-400 group-hover:text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </div>
+                    </div>
+                `;
+                itemContainer.appendChild(singleCard);
+            }
+            grid.appendChild(itemContainer);
+        });
+
+        // -- 事件監聽 --
+        // 使用事件委派來處理所有父卡片的點擊
+        grid.addEventListener('click', function(e) {
+            const parentCard = e.target.closest('.parent-card');
+            if (parentCard) {
+                const targetId = parentCard.dataset.target;
+                const childContainer = document.getElementById(targetId);
+                if (childContainer) {
+                    childContainer.classList.toggle('expanded');
+                    parentCard.classList.toggle('expanded'); // 同時為父卡片也加上 class, 方便改變樣式
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
+
